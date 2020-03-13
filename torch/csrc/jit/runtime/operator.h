@@ -29,7 +29,7 @@ struct Node;
 using ::c10::FunctionSchema;
 using ::c10::Symbol;
 
-using OperationCreator = Operation (*)(const Node*);
+using OperationCreator = std::function<Operation(const Node*)>;
 
 /*
  * Note: JIT relies on Operator instances having static lifetime, because
@@ -69,7 +69,7 @@ struct TORCH_API Operator {
 
   Operator(
       const std::string& schema,
-      int (*op)(Stack&),
+      Operation op,
       c10::AliasAnalysisKind alias_analysis)
       : schema_string_(schema),
         alias_analysis_(alias_analysis),

@@ -1342,6 +1342,10 @@ def _script_if_tracing(fn):
     return wrapper
 
 
+def to_test_backend(module, extra_info):
+    return torch._C._jit_to_test_backend(module, {"forward": extra_info})
+    
+
 def script_method(fn):
     if not _enabled:
         return fn

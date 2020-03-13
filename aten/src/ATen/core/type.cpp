@@ -937,7 +937,7 @@ size_t ClassType::addAttribute(
     bool is_parameter) {
   const char* what = is_parameter ? "parameter" : "attribute";
   checkNotExist(name, what);
-  checkNoAny(*this, what, name, type);
+  // checkNoAny(*this, what, name, type);
 
   size_t slot = attributeNames_.size();
   attributeNames_.push_back(name);

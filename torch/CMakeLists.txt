@@ -68,6 +68,7 @@ set(TORCH_PYTHON_SRCS
     ${TORCH_SRC_DIR}/csrc/autograd/python_legacy_variable.cpp
     ${TORCH_SRC_DIR}/csrc/autograd/python_variable.cpp
     ${TORCH_SRC_DIR}/csrc/autograd/python_variable_indexing.cpp
+    ${TORCH_SRC_DIR}/csrc/jit/backends/backend_init.cpp
     ${TORCH_SRC_DIR}/csrc/jit/python/init.cpp
     ${TORCH_SRC_DIR}/csrc/jit/passes/onnx.cpp
     ${TORCH_SRC_DIR}/csrc/jit/passes/onnx/fixup_onnx_conditionals.cpp

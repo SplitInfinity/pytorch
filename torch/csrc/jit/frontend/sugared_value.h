@@ -284,8 +284,17 @@ struct TORCH_API BuiltinModule : public SugaredValue {
       // methods under its module.
       return std::make_shared<BuiltinModule>("aten", version);
     }
+
+    if (name == "torch" && field == "ops") {
+      return std::make_shared<BuiltinModule>("ops", version);
+    } else if (name == "ops") {
+      return std::make_shared<BuiltinModule>(field, version);
+    }
+
     return std::make_shared<BuiltinFunction>(
-        Symbol::fromQualString(name + "::" + field), c10::nullopt);
+        Symbol::fromQualString(
+            (name == "torch" ? "aten" : name) + "::" + field),
+        c10::nullopt);
   }
 
  private:

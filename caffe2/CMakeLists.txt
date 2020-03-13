@@ -380,6 +380,7 @@ if(NOT INTERN_BUILD_MOBILE OR NOT BUILD_CAFFE2_MOBILE)
     ${TORCH_SRC_DIR}/csrc/jit/runtime/interpreter.cpp
     ${TORCH_SRC_DIR}/csrc/jit/ir/constants.cpp
     ${TORCH_SRC_DIR}/csrc/jit/ir/node_hashing.cpp
+    ${TORCH_SRC_DIR}/csrc/jit/backends/backend.cpp
     ${TORCH_SRC_DIR}/csrc/jit/ir/type_hashing.cpp
     ${TORCH_SRC_DIR}/csrc/jit/ir/ir.cpp
     ${TORCH_SRC_DIR}/csrc/jit/ir/irparser.cpp
