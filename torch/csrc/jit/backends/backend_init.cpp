@@ -9,30 +9,28 @@ void initJitBackendBindings(PyObject* module) {
     // Register custom ops for backend.compile and backend.execute so that the
     // LoweredModule below can call them.
     std::string compile_method_schema =
-        backend.name + "::compile(Any[] a) -> Any[]";
+        backend.name + "::compile(Any a, Dict(str, Any) b) -> Dict(str, Any)";
     std::string execute_method_schema =
-        backend.name + "::execute(Any[] a) -> Any[]";
+        backend.name + "::execute(Any a, Any input) -> Any";
 
     torch::jit::RegisterOperators reg({
         Operator(
             compile_method_schema,
             [=](Stack& stack) {
-              auto inputs = pop(stack).toList();
-              for (auto i = inputs.begin(), e = inputs.end(); i != e; ++i) {
-                push(stack, *i);
-              }
-              backend.compile(stack);
+              auto method_compile_spec = pop(stack).toGenericDict();
+              auto module = pop(stack);
+              auto res = backend.instance->compile(module, method_compile_spec);
+              push(stack, res);
               return 0;
             },
             c10::AliasAnalysisKind::PURE_FUNCTION),
         Operator(
             execute_method_schema,
             [=](Stack& stack) {
-              auto inputs = pop(stack).toList();
-              for (auto i = inputs.begin(), e = inputs.end(); i != e; ++i) {
-                push(stack, *i);
-              }
-              backend.execute(stack);
+              auto input = pop(stack);
+              auto handle = pop(stack);
+              auto res = backend.instance->execute(handle, input);
+              push(stack, res);
               return 0;
             },
             c10::AliasAnalysisKind::PURE_FUNCTION),
@@ -43,8 +41,8 @@ void initJitBackendBindings(PyObject* module) {
     std::string to_backend_method_name = "_jit_to_" + backend.name;
     m.def(
         to_backend_method_name.c_str(),
-        [=](Module orig_module, py::dict extra_infos) {
-          // TODO: Validate extra_infos.
+        [=](Module orig_module, py::dict method_compile_spec) {
+          // TODO: Validate method_compile_spec.
 
           // Clone orig_module to make sure backend transformation is
           // functional.
@@ -55,20 +53,25 @@ void initJitBackendBindings(PyObject* module) {
               DictType::create(StringType::get(), AnyType::get());
 
           // Call preprocess.
-          Stack stack;
-          push(stack, cloned_module._ivalue());
-          push(stack, toIValue(extra_infos, any_dict_ty));
-          backend.preprocess(stack);
-          IValue preprocessed_module = pop(stack);
+          auto preprocessed_module = backend.instance->preprocess(
+              cloned_module._ivalue(),
+              toIValue(method_compile_spec, any_dict_ty).toGenericDict());
 
           // Generate LoweredModule.
           Module loweredModule("torch.jit." + backend.name + "LoweredModule");
 
           // Generate attributes.
-          // This is for the extra_infos passed in to to_<backend> or loaded
-          // from an export model.
+          // This is for the method_compile_spec passed in to to_<backend> or
+          // loaded from an export model.
           loweredModule.register_attribute(
-              "__extra_infos", any_dict_ty, toIValue(extra_infos, any_dict_ty));
+              "__method_compile_spec",
+              any_dict_ty,
+              toIValue(method_compile_spec, any_dict_ty).toGenericDict());
+
+          loweredModule.register_attribute(
+              "__backend",
+              CapsuleType::get(),
+              IValue::make_capsule(backend.instance));
 
           // This is the list of opaque backend handles returned by
           // backend.compile.
@@ -85,39 +88,41 @@ void initJitBackendBindings(PyObject* module) {
           // Methods.
           loweredModule.define(R"(
             def __getstate__(self):
-                return self.__extra_infos, self.__orig_module
+                return self.__method_compile_spec, self.__orig_module, self.__backend
             )");
 
           // This is a convenient wrapper for backend.compile.
           loweredModule.define(
               "\ndef __compile__(self):\n"
-              //"\tself.__backend_handles.clear()"
-              "\thandles: List[Any] = torch.ops." +
+              "\tself.__backend_handles = torch.ops." +
               backend.name +
-              ".compile(self, self.__orig_module, self.__extra_infos)\n"
-              "\tfor h, k in zip(handles, self.__extra_infos.keys()):\n"
-              "\t\tself.__backend_handles[k] = h\n");
+              ".compile(self.__orig_module, self.__method_compile_spec)\n");
 
           loweredModule.define(R"(
             def __setstate__(self, state):
-                self.__extra_infos = state[0]
+                self.__method_compile_spec = state[0]
                 self.__orig_module = state[1]
+                self.__backend = state[2]
                 self.__compile__()
             )");
 
           // This loop generates one method on the LoweredModule for every key
-          // in extra_infos.
-          for (auto& e : extra_infos) {
+          // in method_compile_spec.
+          for (auto& e : method_compile_spec) {
             std::string method_name = py::cast<std::string>(e.first);
 
             loweredModule.define(
                 "\ndef " + method_name + "(self, input):\n\treturn torch.ops." +
-                backend.name + ".execute(self, self.__backend_handles[\"" +
+                backend.name + ".execute(self.__backend_handles[\"" +
                 method_name + "\"], input)\n");
           }
 
           // Call compile to ensure that the returned Module is ready to run.
-          loweredModule.run_method("__compile__");
+          auto state = at::ivalue::Tuple::create(
+              toIValue(method_compile_spec, any_dict_ty).toGenericDict(),
+              preprocessed_module,
+              IValue::make_capsule(backend.instance));
+          loweredModule.run_method("__setstate__", state);
           return loweredModule;
         });
   }

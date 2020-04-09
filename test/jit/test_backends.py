@@ -3,6 +3,7 @@ import sys
 import unittest
 
 import torch
+import torch._C
 from torch.testing import FileCheck
 from torch._six import PY2
 
@@ -15,6 +16,10 @@ if __name__ == '__main__':
     raise RuntimeError("This test file is not meant to be run directly, use:\n\n"
                        "\tpython test/test_jit.py TESTNAME\n\n"
                        "instead.")
+
+
+def to_test_backend(module, method_compile_spec):
+    return torch._C._jit_to_test_backend(module, {"forward": method_compile_spec})
 
 
 class MyModule(torch.nn.Module):
@@ -30,7 +35,7 @@ class TestBackends(JitTestCase):
     def test_simple(self):
         # Test compile.
         scripted_module = torch.jit.script(MyModule())
-        lowered_module = torch.jit.to_test_backend(scripted_module._c, {"key": "value"})
+        lowered_module = to_test_backend(scripted_module._c, {"key": "value"})
         
         # Test execute.
         input = torch.randn(5)

@@ -10,37 +10,26 @@ namespace jit {
 // necessary to test that the JIT backend registration endpoints and
 // code generation are working correctly. It is not intended to
 // produce numerically correct results.
-RegisterBackend backend({
-    "test_backend",
-    /*preprocess=*/
-    [](Stack& stack) -> int {
-      auto extra_infos = pop(stack).toGenericDict();
-      auto mod = pop(stack).toModule();
-      // Return the given module.
-      push(stack, mod._ivalue());
-      return 0;
-    },
-    [/*compile=*/](Stack& stack) -> int {
-      auto extra_infos = pop(stack).toGenericDict();
-      auto orig_mod = pop(stack).toModule();
-      auto mod = pop(stack).toModule();
-      auto handles = c10::impl::GenericList(IntType::get());
-      // Use the integer 1 as a handle.
-      handles.emplace_back(1);
-      push(stack, handles);
-      return 0;
-    },
-    /*execute=*/
-    [](Stack& stack) -> int {
-      auto input = pop(stack).toTensor();
-      auto handle = pop(stack).toInt();
-      (void)handle;
-      auto mod = pop(stack).toModule();
-      // Return the input Tensor as the output.
-      push(stack, input);
-      return 0;
-    },
-});
+class TestBackend : public PyTorchBackendInterface {
+ public:
+  explicit TestBackend() {}
+  c10::IValue preprocess(
+      c10::IValue mod,
+      c10::impl::GenericDict method_compile_spec) override {
+    return mod;
+  }
+  c10::impl::GenericDict compile(
+      c10::IValue processed,
+      c10::impl::GenericDict method_compile_spec) override {
+    return method_compile_spec;
+  }
+  c10::IValue execute(c10::IValue handle, c10::IValue input) override {
+    return input;
+  }
+};
+
+RegisterBackend backend({/*name=*/"test_backend",
+                         /*instance=*/c10::make_intrusive<TestBackend>()});
 
 } // namespace jit
 } // namespace torch
