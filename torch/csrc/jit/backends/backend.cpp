@@ -5,7 +5,6 @@ namespace jit {
 namespace {
 using BackendList = std::vector<Backend>;
 
-// Registry class for backends.
 struct BackendRegistry {
  private:
   BackendList backends_;
@@ -26,12 +25,16 @@ BackendRegistry& getRegistry() {
 }
 } // anonymous namespace
 
-RegisterBackend::RegisterBackend(Backend backend) {
-  getRegistry().registerBackend(std::move(backend));
+void registerPreprocessor(
+    std::string name,
+    BackendPreprocessFn fn,
+    c10::intrusive_ptr<PyTorchBackendInterface> instance) {
+  getRegistry().registerBackend({name, fn, instance});
 }
 
 const std::vector<Backend>& getAllBackends() {
   return getRegistry().getAllBackends();
 }
+
 } // namespace jit
 } // namespace torch

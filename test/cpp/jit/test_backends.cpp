@@ -6,41 +6,40 @@
 namespace torch {
 namespace jit {
 
-// This test JIT backend is intended to do the minimal amount of work
-// necessary to test that the JIT backend registration endpoints and
-// code generation are working correctly. It is not intended to
-// produce numerically correct results.
-RegisterBackend backend({
+class TestBackendInterface : public PyTorchBackendInterface {
+ public:
+  TestBackendInterface() {}
+  c10::Dict<std::string, c10::IValue> compile(
+      c10::IValue processed,
+      c10::Dict<std::string, c10::IValue> method_compile_spec) override {
+    return method_compile_spec;
+    // int count = 0;
+    // auto typed_spec = c10::impl::toTypedDict<std::string,
+    // c10::IValue>(method_compile_spec); c10::impl::GenericDict
+    // res(StringType::get(), AnyType::get()); for (auto it =
+    // typed_spec.begin(), end = typed_spec.end(); it != end;
+    //      ++it) {
+    //   res.insert(it->key(), count);
+    //   ++count;
+    // }
+
+    // return res;
+  }
+
+  c10::IValue execute(c10::IValue handle, c10::IValue input) override {
+    return input.toTensor();
+  }
+};
+
+c10::IValue test_backend_preprocess(
+    c10::IValue cloned_orig,
+    c10::Dict<std::string, c10::IValue> method_compile_spec) {
+  return cloned_orig;
+}
+
+static auto testBackend = torch::jit::registerBackend<TestBackendInterface>(
     "test_backend",
-    /*preprocess=*/
-    [](Stack& stack) -> int {
-      auto extra_infos = pop(stack).toGenericDict();
-      auto mod = pop(stack).toModule();
-      // Return the given module.
-      push(stack, mod._ivalue());
-      return 0;
-    },
-    [/*compile=*/](Stack& stack) -> int {
-      auto extra_infos = pop(stack).toGenericDict();
-      auto orig_mod = pop(stack).toModule();
-      auto mod = pop(stack).toModule();
-      auto handles = c10::impl::GenericList(IntType::get());
-      // Use the integer 1 as a handle.
-      handles.emplace_back(1);
-      push(stack, handles);
-      return 0;
-    },
-    /*execute=*/
-    [](Stack& stack) -> int {
-      auto input = pop(stack).toTensor();
-      auto handle = pop(stack).toInt();
-      (void)handle;
-      auto mod = pop(stack).toModule();
-      // Return the input Tensor as the output.
-      push(stack, input);
-      return 0;
-    },
-});
+    test_backend_preprocess);
 
 } // namespace jit
 } // namespace torch

@@ -49,7 +49,10 @@ struct NativeResolver : public Resolver {
       const std::string& name,
       Function& m,
       const SourceRange& loc) override {
-    return std::make_shared<BuiltinModule>("torch");
+    if (name == "torch") {
+      return std::make_shared<BuiltinModule>("aten");
+    }
+    return nullptr;
   }
 
   TypePtr resolveType(const std::string& name, const SourceRange& loc)

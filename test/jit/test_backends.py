@@ -30,6 +30,7 @@ class TestBackends(JitTestCase):
     def test_simple(self):
         # Test compile.
         scripted_module = torch.jit.script(MyModule())
+        dir(torch.jit)
         lowered_module = torch.jit.to_test_backend(scripted_module._c, {"key": "value"})
         
         # Test execute.
